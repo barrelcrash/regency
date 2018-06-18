@@ -10,7 +10,8 @@
 #include <string.h>
 #include <time.h>
 
-#define MAX 5000
+#define MAX_POSSIBLE_RANGE 10000
+#define MAX_RESULT 100000
 #define MAXBUF 100
 #define MAX_DIGIT 9
 
@@ -25,8 +26,10 @@ enum ruletypes {
 typedef struct Rule Rule;
 struct Rule {
   int type;
+  char *range;
   char *value;
   Rule *next;
+  Rule *tail;
 };
 
 /*
@@ -49,7 +52,7 @@ Rule *createLiteral(char*);
 Rule *createDigitRule();
 Rule *createRangeRule(char[]);
 Rule *createDictRule();
-void repeatLastRule(Rule *, char[]);
+Rule *parseQuantifier(Rule *, char[]);
 int randomIntInclusive(int, int);
 
 /* memory allocation */
@@ -88,9 +91,9 @@ int main(int argc, char **argv) {
 }
 
 void printRules(Rule *listp) {
-  char *result = emalloc(sizeof(char));
+  char *result = emalloc(sizeof(char) * MAX_RESULT);
   for ( ; listp != NULL; listp = listp->next) {
-    result = realloc(result, sizeof(result) + sizeof(listp->value));
+    // result = realloc(result, sizeof(result) + sizeof(listp->value));
     strcat(result, listp->value);
   }
   printf("%s\n", result);
@@ -143,7 +146,7 @@ Rule *parseRuleString(Rule *listp, char **s) {
       }
 
       if (strlen(buf) > 0) {
-        repeatLastRule(listp, buf);
+        listp = parseQuantifier(listp, buf);
       }
 
     // all other characters
@@ -171,6 +174,7 @@ Rule *add(Rule *listp, Rule *newp) {
     ;
 
   p->next = newp;
+  listp->tail = newp;
   return listp;
 }
 
@@ -187,7 +191,7 @@ Rule *createDigitRule() {
 
 /* createRangeRule: creates a rule based on a bracketed range of characters */
 Rule *createRangeRule(char buf[]) {
-  int possible[MAX]; // possible values
+  int possible[MAX_POSSIBLE_RANGE];
   unsigned int i, j, start, end;
 
   j = 0;
@@ -212,7 +216,9 @@ Rule *createRangeRule(char buf[]) {
 
   char token[] = {possible[randomIntInclusive(0, j - 1)], '\0'};
 
-  return newRule(RANGE, strdupl(token));
+  Rule *new = newRule(RANGE, strdupl(token));
+  new->range = strdupl(buf);
+  return new;
 }
 
 /* createDictRule: create a rule from a random dictionary word */
@@ -221,7 +227,40 @@ Rule *createDictRule() {
 }
 
 
-void repeatLastRule(Rule *listp, char buf[]) {
+Rule *parseQuantifier(Rule *listp, char buf[]) {
+  Rule *tail;
+  if (listp->next == NULL)
+    tail = listp;
+  else {
+    tail = listp->tail;
+  }
+
+  int times;
+  if ((times = atoi(buf)) == 0) {
+    printf("parseQuantifier: quantity was not a number, ignoring\n");
+    return listp;
+  }
+
+  int ruleType = tail->type;
+  for (int i = 0; i < (times - 1); i++) {
+    if (ruleType == LITERAL) {
+      listp = add(listp, createLiteral(tail->value));
+    } else if (ruleType == DIGIT) {
+      listp = add(listp, createDigitRule());
+    } else if (ruleType == RANGE) {
+      listp = add(listp, createRangeRule(tail->range));
+    } else if (ruleType == DICT) {
+      listp = add(listp, createDictRule());
+    } else {
+      printf("parseQuantifier: invalid rule type %d encountered, ignoring\n", ruleType);
+    }
+  }
+  return listp;
+}
+
+/* repeatRule: sees that a rule is iterated a certain number of times (1 is no further iteration) */
+Rule *repeatRule(Rule *listp, Rule *rule, int times) {
+  return listp;
 }
 
 /* randomIntInclusive: return int between l to u, inclusive*/
@@ -255,6 +294,7 @@ Rule *newRule(int type, char *value) {
   newp->type = type;
   newp->value = value;
   newp->next = NULL;
+  newp->tail = NULL;
   return newp;
 }
 
