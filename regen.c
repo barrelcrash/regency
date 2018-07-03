@@ -17,8 +17,6 @@
 
 enum ruletypes {
   INVALID = 0,
-  LITERAL,
-  DIGIT,
   RANGE,
   DICT
 };
@@ -27,7 +25,6 @@ typedef struct Rule Rule;
 struct Rule {
   int type;
   char *range;
-  char *value;
   Rule *next;
   Rule *tail;
 };
@@ -35,29 +32,18 @@ struct Rule {
 /*
  * external variables
  */
-
 extern char *dict[];
 extern const int dict_length;
 
 /*
  * function declarations
  */
-/* input and output */
-Rule *parseRuleString(Rule *, char**);
+Rule *parseRuleString(Rule *, char*);
 void printRules(Rule *);
-
-/* rule creation */
 Rule *add(Rule *, Rule *);
-Rule *createLiteral(char*);
-Rule *createDigitRule();
 Rule *createRangeRule(char[]);
 Rule *createDictRule();
-Rule *parseQuantifier(Rule *, char[]);
-int randomIntInclusive(int, int);
-
-/* memory allocation */
 Rule *newRule(int, char *);
-char *strdupl(char *);
 void *emalloc(unsigned);
 
 /*
@@ -85,83 +71,84 @@ int main(int argc, char **argv) {
 
   Rule *ruleList = NULL;
 
-  ruleList = parseRuleString(ruleList, argv);
+  ruleList = parseRuleString(ruleList, *argv);
 
   printRules(ruleList);
 }
 
 void printRules(Rule *listp) {
-  char *result = emalloc(sizeof(char) * MAX_RESULT);
   for ( ; listp != NULL; listp = listp->next) {
-    // result = realloc(result, sizeof(result) + sizeof(listp->value));
-    strcat(result, listp->value);
+    printf("type: %d, range: %s\n", listp->type, listp->range);
   }
-  printf("%s\n", result);
 }
 
 /*
  * parseRuleString: iterate through string and create rules base
  * on the character sequences encountered
  */
-Rule *parseRuleString(Rule *listp, char **s) {
+Rule *parseRuleString(Rule *listp, char *s) {
 
+  printf("input: %s\n", s);
   do {
     // escaped chars
-    if (**s == '\\') {
-      if (*++(*s) == 'd') {
-        listp = add(listp, createDigitRule());
-      } else if (**s == 'w') {
+    putchar(*s);
+    putchar('\n');
+    if (*s == '\\') {
+      if (*++s == 'd') {
+        listp = add(listp, createRangeRule("0-9"));
+      } else if (*s == 'w') {
         listp = add(listp, createRangeRule("a-zA-Z0-9_"));
-      } else if (**s == 'y') {
+      } else if (*s == 'y') {
         listp = add(listp, createDictRule());
       } else {
-        char buf[] = {**s, '\0'};
-        listp = add(listp, createLiteral(buf));
-      }
-
-    // bracketed ranges
-    } else if (**s == '[') {
-      char buf[MAXBUF];
-      int i;
-
-      i = 0;
-
-      while(*++(*s) != ']') {
-        buf[i++] = **s;
-      }
-
-      if (strlen(buf) > 0) {
+        char buf[] = {*s, '\0'};
         listp = add(listp, createRangeRule(buf));
       }
 
-    // quantifiers
-    } else if (**s == '{') {
-      char buf[MAXBUF];
+    // bracketed ranges
+    } else if (*s == '[') {
+      char rangebuf[MAXBUF];
       int i;
 
       i = 0;
 
-      while(*++(*s) != '}') {
-        buf[i++] = **s;
+      while(*++s != ']') {
+        rangebuf[i++] = *s;
       }
 
-      if (strlen(buf) > 0) {
-        listp = parseQuantifier(listp, buf);
+      rangebuf[++i] = '\0';
+
+      if (strlen(rangebuf) > 0) {
+        listp = add(listp, createRangeRule(rangebuf));
+      }
+
+    // quantifiers
+    } else if (*s == '{') {
+      char lenbuf[MAXBUF];
+      int i;
+
+      i = 0;
+
+      while(*++s != '}') {
+        lenbuf[i++] = *s;
+      }
+
+      lenbuf[++i] = '\0';
+
+      if (strlen(lenbuf) > 0) {
+        // TODO: rebuild quantifiers
+        // listp = parseQuantifier(listp, buf);
       }
 
     // all other characters
     } else {
-      char buf[] = {**s, '\0'};
-      listp = add(listp, createLiteral(buf));
+      char buf[] = {*s, '\0'};
+      listp = add(listp, createRangeRule(buf));
     }
-  } while (*++(*s) != '\0');
+  } while (*++s != '\0');
 
   return listp;
 }
-
-/*
- * RULE CREATION
- */
 
 /* add: add a rule to the end of rule list */
 Rule *add(Rule *listp, Rule *newp) {
@@ -173,139 +160,34 @@ Rule *add(Rule *listp, Rule *newp) {
   for (p = listp; p->next != NULL; p = p->next)
     ;
 
+  printf("add range: %s\n", newp->range);
   p->next = newp;
   listp->tail = newp;
   return listp;
 }
 
-/* createLiteral: creates a rule of the character passed to it */
-Rule *createLiteral(char *token) {
-  return newRule(LITERAL, strdupl(token));
-}
-
-/* createDigitRule: creates a rule of a random number 0-9 */
-Rule *createDigitRule() {
-  char token[] = {randomIntInclusive(0, MAX_DIGIT) + '0', '\0'};
-  return newRule(DIGIT, strdupl(token));
-}
-
-/* createRangeRule: creates a rule based on a bracketed range of characters */
-Rule *createRangeRule(char buf[]) {
-  int possible[MAX_POSSIBLE_RANGE];
-  unsigned int i, j, start, end;
-
-  j = 0;
-
-  for (i = 0; i < strlen(buf) - 1; i++) {
-    if (buf[i] == ']') {
-      break; // done creating range
-    } else if (buf[i] == '|') {
-      continue; // since creation is "positive", we just ignore OR
-    } else if (buf[i] == '-' && i != 0) {
-      start = buf[i - 1];
-      end = buf[++i];
-    } else if (buf[i + 1] == '-') {
-      continue; // ignore prior to `-` handle it in the above cond
-    } else {
-      possible[j++] = buf[i];
-      continue; // literal charcter, add to possible and continue
-    }
-
-    possible[j++] = randomIntInclusive(start, end);
-  }
-
-  char token[] = {possible[randomIntInclusive(0, j - 1)], '\0'};
-
-  Rule *new = newRule(RANGE, strdupl(token));
-  new->range = strdupl(buf);
-  return new;
-}
-
-/* createDictRule: create a rule from a random dictionary word */
-Rule *createDictRule() {
-  return newRule(DICT, dict[randomIntInclusive(0, dict_length - 1)]);
-}
-
-
-Rule *parseQuantifier(Rule *listp, char buf[]) {
-  Rule *tail;
-  if (listp->next == NULL)
-    tail = listp;
-  else {
-    tail = listp->tail;
-  }
-
-  int times;
-  if ((times = atoi(buf)) == 0) {
-    printf("parseQuantifier: quantity was not a number, ignoring\n");
-    return listp;
-  }
-
-  int ruleType = tail->type;
-  for (int i = 0; i < (times - 1); i++) {
-    if (ruleType == LITERAL) {
-      listp = add(listp, createLiteral(tail->value));
-    } else if (ruleType == DIGIT) {
-      listp = add(listp, createDigitRule());
-    } else if (ruleType == RANGE) {
-      listp = add(listp, createRangeRule(tail->range));
-    } else if (ruleType == DICT) {
-      listp = add(listp, createDictRule());
-    } else {
-      printf("parseQuantifier: invalid rule type %d encountered, ignoring\n", ruleType);
-    }
-  }
-  return listp;
-}
-
-/* repeatRule: sees that a rule is iterated a certain number of times (1 is no further iteration) */
-Rule *repeatRule(Rule *listp, Rule *rule, int times) {
-  return listp;
-}
-
-/* randomIntInclusive: return int between l to u, inclusive*/
-int randomIntInclusive(int l, int u) {
-
-  if (u < l) {
-    fprintf(stderr, "randomIntInclusive: lower bound greater than upper bound");
-    exit(1);
-  }
-
-  int offset = u - l;
-
-  int div = RAND_MAX/(offset + 1);
-  int val;
-
-  do {
-    rand();
-    val = rand() / div;
-  } while (val > u);
-
-  return val + l;
-}
-
 /*
- * MEMORY ALLOCATION
+ * Rule Creation
  */
 
-/* newRule: allocate a new rule and populate its fields */
-Rule *newRule(int type, char *value) {
+Rule *newRule(int type, char *range) {
   Rule *newp = (Rule *) emalloc(sizeof(Rule));
   newp->type = type;
-  newp->value = value;
+  newp->range = range;
   newp->next = NULL;
   newp->tail = NULL;
+
   return newp;
 }
 
+/* createRangeRule: creates a rule based on a bracketed range of characters */
+Rule *createRangeRule(char *buf) {
+  Rule *new = newRule(RANGE, buf);
+  return new;
+}
 
-/* strdupl: allocate memory for and memcpy a string */
-char *strdupl(char *src) {
-  size_t len = strlen(src) + 1;
-  char *s = malloc(len);
-  if (s == NULL)
-    return NULL;
-  return (char *) memcpy(s, src, len);
+Rule *createDictRule() {
+  return newRule(DICT, NULL);
 }
 
 /* emalloc: malloc w/ error handling */
@@ -317,4 +199,3 @@ void *emalloc(unsigned size) {
   }
   return p;
 }
-
