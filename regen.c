@@ -44,6 +44,7 @@ Rule *add(Rule *, Rule *);
 Rule *createRangeRule(char[]);
 Rule *createDictRule();
 Rule *newRule(int, char *);
+char *strdupl(char *);
 void *emalloc(unsigned);
 
 /*
@@ -88,11 +89,8 @@ void printRules(Rule *listp) {
  */
 Rule *parseRuleString(Rule *listp, char *s) {
 
-  printf("input: %s\n", s);
   do {
     // escaped chars
-    putchar(*s);
-    putchar('\n');
     if (*s == '\\') {
       if (*++s == 'd') {
         listp = add(listp, createRangeRule("0-9"));
@@ -101,7 +99,7 @@ Rule *parseRuleString(Rule *listp, char *s) {
       } else if (*s == 'y') {
         listp = add(listp, createDictRule());
       } else {
-        char buf[] = {*s, '\0'};
+        char buf[2] = {*s, '\0'};
         listp = add(listp, createRangeRule(buf));
       }
 
@@ -119,7 +117,7 @@ Rule *parseRuleString(Rule *listp, char *s) {
       rangebuf[++i] = '\0';
 
       if (strlen(rangebuf) > 0) {
-        listp = add(listp, createRangeRule(rangebuf));
+        listp = add(listp, createRangeRule(strdupl(rangebuf)));
       }
 
     // quantifiers
@@ -143,7 +141,7 @@ Rule *parseRuleString(Rule *listp, char *s) {
     // all other characters
     } else {
       char buf[] = {*s, '\0'};
-      listp = add(listp, createRangeRule(buf));
+      listp = add(listp, createRangeRule(strdupl(buf)));
     }
   } while (*++s != '\0');
 
@@ -160,7 +158,6 @@ Rule *add(Rule *listp, Rule *newp) {
   for (p = listp; p->next != NULL; p = p->next)
     ;
 
-  printf("add range: %s\n", newp->range);
   p->next = newp;
   listp->tail = newp;
   return listp;
@@ -176,7 +173,6 @@ Rule *newRule(int type, char *range) {
   newp->range = range;
   newp->next = NULL;
   newp->tail = NULL;
-
   return newp;
 }
 
@@ -198,4 +194,13 @@ void *emalloc(unsigned size) {
     exit(1);
   }
   return p;
+}
+
+/* strdupl: allocate memory for and memcpy a string */
+char *strdupl(char *src) {
+  size_t len = strlen(src) + 1;
+  char *s = malloc(len);
+  if (s == NULL)
+    return NULL;
+  return (char *) memcpy(s, src, len);
 }
