@@ -17,8 +17,8 @@
 
 enum ruletypes {
   INVALID = 0,
-  RANGE,
-  DICT
+  RANGE, // 'standard' type, value chosen from a char range
+  DICT   // value chosen from a list of words
 };
 
 typedef struct Rule Rule;
@@ -38,12 +38,23 @@ extern const int dict_length;
 /*
  * function declarations
  */
+// parsing
 Rule *parseRuleString(Rule *, char*);
+
+// rule printing
 void printRules(Rule *);
-Rule *add(Rule *, Rule *);
+void printRange(char[]);
+
+// rule creation
 Rule *createRangeRule(char[]);
 Rule *createDictRule();
 Rule *newRule(int, char *);
+
+// utility
+int randomIntInclusive(int, int);
+Rule *add(Rule *, Rule *);
+
+// memory
 char *strdupl(char *);
 void *emalloc(unsigned);
 
@@ -77,11 +88,9 @@ int main(int argc, char **argv) {
   printRules(ruleList);
 }
 
-void printRules(Rule *listp) {
-  for ( ; listp != NULL; listp = listp->next) {
-    printf("type: %d, range: %s\n", listp->type, listp->range);
-  }
-}
+/*
+ * Parsing
+ */
 
 /*
  * parseRuleString: iterate through string and create rules base
@@ -148,19 +157,55 @@ Rule *parseRuleString(Rule *listp, char *s) {
   return listp;
 }
 
-/* add: add a rule to the end of rule list */
-Rule *add(Rule *listp, Rule *newp) {
-  Rule *p;
+/*
+ * Rule Printing
+ */
 
-  if (listp == NULL) {
-    return newp;
+/*
+ * printRules: delegate the printing of a rule to the appropriate
+ * print method
+ */
+void printRules(Rule *listp) {
+  for ( ; listp != NULL; listp = listp->next) {
+    // printf("type: %d, range: %s\n", listp->type, listp->range);
+    if (listp->type == RANGE) {
+      printRange(listp->range);
+    } else if (listp->type == DICT) {
+      // implement dict rule
+    }
   }
-  for (p = listp; p->next != NULL; p = p->next)
-    ;
+  putchar('\n');
+}
 
-  p->next = newp;
-  listp->tail = newp;
-  return listp;
+/*
+ * printRange: prints a character based on a regex-like range
+ */
+void printRange(char buf[]) {
+  int possible[MAX_POSSIBLE_RANGE];
+  unsigned int i, j;
+
+  j = 0;
+
+  for (i = 0; i < strlen(buf); i++) {
+    if (buf[i] == ']') {
+      break; // done creating range
+    } else if (buf[i] == '|') {
+      continue; // since creation is "positive", we just ignore OR
+    } else if (i > 0 && (buf[i + 1] == '-' || buf[i - 1] == '-')) {
+      continue; // ignore around `-` handle it in the below cond
+    } else if (buf[i] == '-' && i != 0) {
+      int start = buf[i - 1];
+      int end = buf[++i];
+      for (int k = start; k <= end; k++) {
+        possible[j++] = k;
+      }
+    } else {
+      possible[j++] = buf[i];
+      continue; // literal character, add to possible and continue
+    }
+  }
+
+  putchar(possible[randomIntInclusive(0, j - 1)]);
 }
 
 /*
@@ -176,7 +221,9 @@ Rule *newRule(int type, char *range) {
   return newp;
 }
 
-/* createRangeRule: creates a rule based on a bracketed range of characters */
+/*
+ * createRangeRule: creates a rule based on a bracketed range of characters
+ */
 Rule *createRangeRule(char *buf) {
   Rule *new = newRule(RANGE, buf);
   return new;
@@ -186,7 +233,57 @@ Rule *createDictRule() {
   return newRule(DICT, NULL);
 }
 
-/* emalloc: malloc w/ error handling */
+/*
+ * Utility
+ */
+
+/* 
+ * add: add a rule to the end of rule list
+ */
+Rule *add(Rule *listp, Rule *newp) {
+  Rule *p;
+
+  if (listp == NULL) {
+    return newp;
+  }
+  for (p = listp; p->next != NULL; p = p->next)
+    ;
+
+  p->next = newp;
+  listp->tail = newp;
+  return listp;
+}
+
+/*
+ * randomIntInclusive: return int between l to u, inclusive
+ */
+int randomIntInclusive(int l, int u) {
+
+  if (u < l) {
+    fprintf(stderr, "randomIntInclusive: lower bound %d greater than upper bound %d\n", l, u);
+    exit(1);
+  }
+
+  int offset = u - l;
+
+  int div = RAND_MAX/(offset + 1);
+  int val;
+
+  do {
+    rand();
+    val = rand() / div;
+  } while (val > u);
+
+  return val + l;
+}
+
+/*
+ * Memory
+ */
+
+/*
+ * emalloc: malloc w/ error handling
+ */
 void *emalloc(unsigned size) {
   void *p = malloc(size);
   if (p == NULL) {
@@ -196,10 +293,12 @@ void *emalloc(unsigned size) {
   return p;
 }
 
-/* strdupl: allocate memory for and memcpy a string */
+/*
+ * strdupl: allocate memory for and memcpy a string
+ */
 char *strdupl(char *src) {
   size_t len = strlen(src) + 1;
-  char *s = malloc(len);
+  char *s = emalloc(len);
   if (s == NULL)
     return NULL;
   return (char *) memcpy(s, src, len);
