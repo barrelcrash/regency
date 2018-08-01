@@ -44,6 +44,7 @@ Rule *parseRuleString(Rule *, char*);
 // rule printing
 void printRules(Rule *);
 void printRange(char[]);
+void printDict();
 
 // rule creation
 Rule *createRangeRule(char[]);
@@ -171,7 +172,7 @@ void printRules(Rule *listp) {
     if (listp->type == RANGE) {
       printRange(listp->range);
     } else if (listp->type == DICT) {
-      // implement dict rule
+      printDict();
     }
   }
   putchar('\n');
@@ -206,6 +207,10 @@ void printRange(char buf[]) {
   }
 
   putchar(possible[randomIntInclusive(0, j - 1)]);
+}
+
+void printDict() {
+  printf("%s", dict[randomIntInclusive(0, dict_length - 1)]);
 }
 
 /*
