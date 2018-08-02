@@ -163,8 +163,12 @@ Rule *parseRuleString(Rule *listp, char *s) {
  * parseQuantifier: duplicate the last rule a given number of times
  */
 Rule *parseQuantifier(Rule *listp, char *buf) {
-  printf("lenbuf: %s\n", buf);
-  listp = add(listp, dupeLastRule(listp));
+  int max = atoi(buf);
+  
+  // starting on 1 as a quantifier of one means no dupes
+  for (int i = 1; i < max; i++) {
+    listp = add(listp, dupeLastRule(listp));
+  }
   return listp;
 }
 
