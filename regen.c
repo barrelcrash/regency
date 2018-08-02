@@ -38,6 +38,7 @@ extern const int dict_length;
  */
 // parsing
 Rule *parseRuleString(Rule *, char*);
+Rule *parseQuantifier(Rule *, char *);
 
 // rule printing
 void printRules(Rule *);
@@ -45,9 +46,10 @@ void printRange(char[]);
 void printDict();
 
 // rule creation
+Rule *newRule(int, char *);
 Rule *createRangeRule(char[]);
 Rule *createDictRule();
-Rule *newRule(int, char *);
+Rule *dupeLastRule(Rule *);
 
 // utility
 int randomIntInclusive(int, int);
@@ -143,7 +145,7 @@ Rule *parseRuleString(Rule *listp, char *s) {
 
       if (strlen(lenbuf) > 0) {
         // TODO: rebuild quantifiers
-        // listp = parseQuantifier(listp, buf);
+        listp = parseQuantifier(listp, lenbuf);
       }
 
     // all other characters
@@ -153,6 +155,16 @@ Rule *parseRuleString(Rule *listp, char *s) {
     }
   } while (*++s != '\0');
 
+  return listp;
+}
+
+
+/*
+ * parseQuantifier: duplicate the last rule a given number of times
+ */
+Rule *parseQuantifier(Rule *listp, char *buf) {
+  printf("lenbuf: %s\n", buf);
+  listp = add(listp, dupeLastRule(listp));
   return listp;
 }
 
@@ -232,8 +244,17 @@ Rule *createRangeRule(char *buf) {
   return new;
 }
 
+/*
+ * createRangeRule: create a rule from the dictionary
+ */
 Rule *createDictRule() {
   return newRule(DICT, NULL);
+}
+
+Rule *dupeLastRule(Rule *listp) {
+  Rule *tail = listp->tail;
+  Rule *new = newRule(tail->type, tail->range);
+  return new;
 }
 
 /*
