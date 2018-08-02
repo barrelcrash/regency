@@ -11,9 +11,7 @@
 #include <time.h>
 
 #define MAX_POSSIBLE_RANGE 10000
-#define MAX_RESULT 100000
 #define MAXBUF 100
-#define MAX_DIGIT 9
 
 enum ruletypes {
   INVALID = 0,
